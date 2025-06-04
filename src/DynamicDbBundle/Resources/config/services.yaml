@@ -1,0 +1,6 @@
+services:
+  Feroz\DynamicDbBundle\:
+    resource: '../../*'
+    exclude: '../../{DependencyInjection,Entity,Resources,Tests}'
+
+  Feroz\DynamicDbBundle\Service\DynamicEntityManagerFactory: ~
