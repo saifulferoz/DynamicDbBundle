@@ -19,7 +19,7 @@ class DynamicEntityManagerFactory
         $dbConfig['password'] = SecurityUtil::decrypt($dbConfig['password'], $this->secret);
         $connectionParams['url'] = $dbConfig['driver'].'://'.$dbConfig['username'].':'.urlencode(
                 $dbConfig['password']
-            ).'@'.$dbConfig['host'].'/'.$dbConfig['dbName'];
+            ).'@'.$dbConfig['host'].':'.$dbConfig['port'].'/'.$dbConfig['dbName'];
 
         $config = ORMSetup::createAttributeMetadataConfiguration(
             [__DIR__.'/../Entity/Other'],
