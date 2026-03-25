@@ -16,10 +16,29 @@ class DynamicEntityManagerFactory
 
     public function createEntityManager(array $dbConfig): EntityManagerInterface
     {
-        $dbConfig['password'] = SecurityUtil::decrypt($dbConfig['password'], $this->secret);
-        $connectionParams['url'] = $dbConfig['driver'].'://'.$dbConfig['username'].':'.urlencode(
-                $dbConfig['password']
-            ).'@'.$dbConfig['host'].':'.$dbConfig['port'].'/'.$dbConfig['dbName'];
+        $dbConfig['password'] = SecurityUtil::decrypt($dbConfig['password'] ?? '', $this->secret);
+        
+        $connectionParams = [];
+
+        if (!empty($dbConfig['connectionString'])) {
+            if (str_contains($dbConfig['connectionString'], '://')) {
+                // If the user provided a full Doctrine URL including schema
+                $connectionParams['url'] = $dbConfig['connectionString'];
+            } else {
+                // For Oracle (oci8, pdo_oci) the TNS or Easy Connect string acts as the dbname.
+                $connectionParams = [
+                    'driver'   => $dbConfig['driver'] ?? 'oci8',
+                    'user'     => $dbConfig['username'] ?? '',
+                    'password' => $dbConfig['password'] ?? '',
+                    'dbname'   => $dbConfig['connectionString'],
+                ];
+            }
+        } else {
+            // Default URL builder
+            $connectionParams['url'] = ($dbConfig['driver'] ?? '').'://'.($dbConfig['username'] ?? '').':'.urlencode(
+                $dbConfig['password'] ?? ''
+            ).'@'.($dbConfig['host'] ?? '').':'.($dbConfig['port'] ?? '').'/'.($dbConfig['dbName'] ?? '');
+        }
 
         $config = ORMSetup::createAttributeMetadataConfiguration(
             [__DIR__.'/../Entity/Other'],
