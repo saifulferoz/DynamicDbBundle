@@ -8,7 +8,8 @@ use Feroz\DynamicDbBundle\Contract\DynamicDbConnectionInterface;
 class DynamicDbProvider
 {
     public function __construct(
-        private EntityManagerInterface $defaultEntityManager
+        private EntityManagerInterface $defaultEntityManager,
+        private ?string $secret = null
     ) {
     }
 
@@ -31,8 +32,8 @@ class DynamicDbProvider
 
         $repository = $this->defaultEntityManager->getRepository($entityClass);
         $classMetadata = $this->defaultEntityManager->getClassMetadata($entityClass);
-        
-        $searchField = 'connectionName';
+
+        $searchField = 'id';
         if (!$classMetadata->hasField($searchField) && $classMetadata->hasField('name')) {
             $searchField = 'name';
         }
@@ -53,6 +54,10 @@ class DynamicDbProvider
 
         if (!$entity instanceof DynamicDbConnectionInterface) {
             return null;
+        }
+
+        if ($this->secret !== null) {
+            $entity->setSecret($this->secret);
         }
 
         return [

@@ -6,18 +6,11 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\ORMSetup;
-use Feroz\DynamicDbBundle\Utility\SecurityUtil;
 
 class DynamicEntityManagerFactory
 {
-    public function __construct(private $secret)
-    {
-    }
-
     public function createEntityManager(array $dbConfig): EntityManagerInterface
     {
-        $dbConfig['password'] = SecurityUtil::decrypt($dbConfig['password'] ?? '', $this->secret);
-        
         $connectionParams = [];
 
         if (!empty($dbConfig['connectionString'])) {
@@ -27,21 +20,21 @@ class DynamicEntityManagerFactory
             } else {
                 // For Oracle (oci8, pdo_oci) the TNS or Easy Connect string acts as the dbname.
                 $connectionParams = [
-                    'driver'   => $dbConfig['driver'] ?? 'oci8',
-                    'user'     => $dbConfig['username'] ?? '',
+                    'driver' => $dbConfig['driver'] ?? 'oci8',
+                    'user' => $dbConfig['username'] ?? '',
                     'password' => $dbConfig['password'] ?? '',
-                    'dbname'   => $dbConfig['connectionString'],
+                    'dbname' => $dbConfig['connectionString'],
                 ];
             }
         } else {
             // Default URL builder
-            $connectionParams['url'] = ($dbConfig['driver'] ?? '').'://'.($dbConfig['username'] ?? '').':'.urlencode(
-                $dbConfig['password'] ?? ''
-            ).'@'.($dbConfig['host'] ?? '').':'.($dbConfig['port'] ?? '').'/'.($dbConfig['dbName'] ?? '');
+            $connectionParams['url'] = ($dbConfig['driver'] ?? '') . '://' . ($dbConfig['username'] ?? '') . ':' . urlencode(
+                    $dbConfig['password'] ?? ''
+                ) . '@' . ($dbConfig['host'] ?? '') . ':' . ($dbConfig['port'] ?? '') . '/' . ($dbConfig['dbName'] ?? '');
         }
 
         $config = ORMSetup::createAttributeMetadataConfiguration(
-            [__DIR__.'/../Entity/Other'],
+            [__DIR__ . '/../Entity/Other'],
             true
         );
 

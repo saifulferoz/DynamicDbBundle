@@ -12,6 +12,7 @@ With this bundle, you can natively use `$doctrine->getConnection('dynamic_name')
 - **On-The-Fly Connections**: Creates connections and entity managers completely dynamically without requiring compile-time setup.
 - **Auto Cache Rebuilding**: Automatically handles clearing the Symfony cache when your dynamic database connection entities are created, updated, or removed, ensuring any new connections are immediately discoverable.
 - **Secure Credentials**: Includes a `SecurityUtil` for encrypting and decrypting sensitive database passwords.
+- **Runtime Secret Injection**: Allows the consumer application to supply the decryption secret via Symfony's DI container, which is automatically forwarded to the connection entity via `setSecret()` before the connection config is built.
 
 ---
 
@@ -36,7 +37,9 @@ return [
 
 ### 1. Create a Configuration Entity
 
-Create a standard Doctrine Entity in your application that stores the database connection configurations. **Crucially, this entity must implement `DynamicDbConnectionInterface`** and provide implementations for all connection parameter getters.
+Create a standard Doctrine Entity in your application that stores the database connection configurations. **Crucially, this entity must implement `DynamicDbConnectionInterface`** and provide implementations for all interface methods, including `setSecret()`.
+
+The `setSecret()` method is called automatically by `DynamicDbProvider` before building the connection config, allowing your entity to make the secret available to downstream logic (e.g., for custom password decryption).
 
 ```php
 namespace App\Entity;
@@ -66,8 +69,10 @@ class TenantConnection implements DynamicDbConnectionInterface
 
     #[ORM\Column(length: 255)]
     private ?string $dbPassword = null;
-    
-    // ... Implement the interface methods ...
+
+    private ?string $secret = null;
+
+    // --- DynamicDbConnectionInterface implementation ---
 
     public function getConnectionName(): string { return $this->connectionName; }
     public function getConnectionString(): ?string { return null; } // Optional: Return Oracle TNS string here
@@ -77,6 +82,15 @@ class TenantConnection implements DynamicDbConnectionInterface
     public function getDatabaseName(): string { return $this->dbName; }
     public function getDatabaseUser(): string { return $this->dbUser; }
     public function getDatabasePassword(): string { return $this->dbPassword; }
+
+    /**
+     * Called automatically by DynamicDbProvider before the connection config is built.
+     * The secret is null when none is configured — implement your decryption logic here.
+     */
+    public function setSecret(?string $secret): void
+    {
+        $this->secret = $secret;
+    }
 }
 ```
 
@@ -114,7 +128,7 @@ class TenantController extends AbstractController
 
 ### 3. Password Encryption (Optional)
 
-You can use the built-in `SecurityUtil` to encrypt database passwords before validating them to your database, and the bundle will decrypt them automatically when creating the EntityManager.
+You can use the built-in `SecurityUtil` to encrypt database passwords before saving them to your database. The bundle will automatically pass your secret to the entity via `setSecret()` before the connection is created.
 
 ```php
 use Feroz\DynamicDbBundle\Utility\SecurityUtil;
@@ -124,9 +138,29 @@ $encryptedPassword = SecurityUtil::encrypt('super_secret_password', 'your_secret
 $tenant->setDbPassword($encryptedPassword);
 ```
 
+### 4. Passing a Secret via Dependency Injection (for Encrypted Passwords)
+
+`DynamicDbProvider` accepts `$secret` as an **optional constructor parameter**. The recommended approach is to bind it in your application's `services.yaml` using a Symfony parameter (e.g. from an environment variable):
+
+```yaml
+# config/services.yaml
+parameters:
+    dynamic_db_secret: '%env(DYNAMIC_DB_SECRET)%'
+
+services:
+    Feroz\DynamicDbBundle\Service\DynamicDbProvider:
+        arguments:
+            $secret: '%dynamic_db_secret%'
+```
+
+With this configuration, `DynamicDbProvider` will automatically call `$entity->setSecret($secret)` on the fetched connection entity before building the connection config, giving the entity access to the secret for custom decryption logic.
+
+If no secret is needed, simply omit the binding — the `$secret` parameter defaults to `null` and `setSecret()` will not be called.
+
 ### How it Works
 1. When you call `$doctrine->getConnection('X')`, the wrapped `DynamicRegistryDecorator` intercepts the request.
 2. If Doctrine natively doesn't know about connection `X`, `DynamicDbProvider` kicks in.
-3. It finds the class implementing `DynamicDbConnectionInterface` dynamically and uses the standard Default EntityManager to fetch the parameters matching `connectionName = 'X'`.
-4. The `DynamicEntityManagerFactory` boots up the new ORM connection.
-5. The connection is cached locally for the remainder of the request.
+3. It finds the class implementing `DynamicDbConnectionInterface` dynamically and uses the default EntityManager to fetch the entity matching `connectionName = 'X'`.
+4. If a `$secret` was configured (via DI), it calls `$entity->setSecret($secret)` on the fetched entity before building the config.
+5. The `DynamicEntityManagerFactory` boots up the new ORM connection using the config.
+6. The connection is cached locally for the remainder of the request.

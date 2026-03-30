@@ -26,4 +26,6 @@ interface DynamicDbConnectionInterface
     public function getDatabaseUser(): string;
 
     public function getDatabasePassword(): string;
+
+    public function setSecret(?string $secret): void;
 }
