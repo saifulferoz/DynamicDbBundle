@@ -11,7 +11,6 @@ With this bundle, you can natively use `$doctrine->getConnection('dynamic_name')
 - **Seamless Doctrine Integration**: Fetches database configuration dynamically via Doctrine's `ManagerRegistry`.
 - **On-The-Fly Connections**: Creates connections and entity managers completely dynamically without requiring compile-time setup.
 - **Auto Cache Rebuilding**: Automatically handles clearing the Symfony cache when your dynamic database connection entities are created, updated, or removed, ensuring any new connections are immediately discoverable.
-- **Secure Credentials**: Includes a `SecurityUtil` for encrypting and decrypting sensitive database passwords.
 - **Runtime Secret Injection**: Allows the consumer application to supply the decryption secret via Symfony's DI container, which is automatically forwarded to the connection entity via `setSecret()` before the connection config is built.
 
 ---
@@ -126,16 +125,30 @@ class TenantController extends AbstractController
 }
 ```
 
-### 3. Password Encryption (Optional)
+### 3. Password Encryption (Consumer Responsibility)
 
-You can use the built-in `SecurityUtil` to encrypt database passwords before saving them to your database. The bundle will automatically pass your secret to the entity via `setSecret()` before the connection is created.
+The bundle does **not** provide a built-in encryption utility. Password encryption and decryption are entirely the consumer's responsibility.
+
+The recommended pattern is:
+
+1. **Encrypt** the password before persisting the entity (using any encryption library of your choice).
+2. **Decrypt** the password inside `getDatabasePassword()` of your entity, using the secret injected via `setSecret()`.
 
 ```php
-use Feroz\DynamicDbBundle\Utility\SecurityUtil;
+public function setSecret(?string $secret): void
+{
+    $this->secret = $secret;
+}
 
-// Encrypt before saving your configuration Entity
-$encryptedPassword = SecurityUtil::encrypt('super_secret_password', 'your_secret_key');
-$tenant->setDbPassword($encryptedPassword);
+public function getDatabasePassword(): string
+{
+    if ($this->secret !== null) {
+        // Decrypt using your own logic / library
+        return MyEncryptionHelper::decrypt($this->dbPassword, $this->secret);
+    }
+
+    return $this->dbPassword; // Return as-is if no secret configured
+}
 ```
 
 ### 4. Passing a Secret via Dependency Injection (for Encrypted Passwords)
