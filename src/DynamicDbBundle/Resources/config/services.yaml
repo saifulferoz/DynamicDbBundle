@@ -2,5 +2,12 @@ services:
   Feroz\DynamicDbBundle\:
     resource: '../../*'
     exclude: '../../{DependencyInjection,Entity,Resources,Tests}'
+    autowire: true
 
   Feroz\DynamicDbBundle\Service\DynamicEntityManagerFactory: ~
+
+  Feroz\DynamicDbBundle\Registry\DynamicRegistryDecorator:
+    decorates: doctrine
+    autowire: true
+    arguments:
+      $decorated: '@.inner'
