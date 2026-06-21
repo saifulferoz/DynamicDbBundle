@@ -1,0 +1,6 @@
+/*** Story *****/
+The purpose of this bundle is to provide a way to fetch database connection information from database table and create connection and entity manager using table data.
+
+/*** Features *****/
+I want to inject doctrine so that bundle user can get connection in symfony using doctrine.
+User should be able fetch connection using connection name.
