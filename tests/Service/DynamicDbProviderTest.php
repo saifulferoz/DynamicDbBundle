@@ -106,4 +106,100 @@ class DynamicDbProviderTest extends TestCase
         $this->assertNull($entity->getSecret());
         $this->assertIsArray($config);
     }
+
+    public function testFindConnectionConfigUsesConnectionNameFieldIfPresent(): void
+    {
+        $entity = new DummyConnectionEntity();
+        $em = $this->createMock(EntityManagerInterface::class);
+
+        $classMetadata = $this->createMock(ClassMetadata::class);
+        $classMetadata->method('getName')->willReturn(DummyConnectionEntity::class);
+        
+        // Mock hasField to return true only for connectionName
+        $classMetadata->method('hasField')->willReturnCallback(function (string $fieldName) {
+            return $fieldName === 'connectionName';
+        });
+
+        $metadataFactory = $this->createMock(ClassMetadataFactory::class);
+        $metadataFactory->method('getAllMetadata')->willReturn([$classMetadata]);
+
+        $repository = $this->createMock(EntityRepository::class);
+        $repository->expects($this->once())
+            ->method('findOneBy')
+            ->with(['connectionName' => 'test_db'])
+            ->willReturn($entity);
+
+        $em->method('getMetadataFactory')->willReturn($metadataFactory);
+        $em->method('getRepository')->willReturn($repository);
+        $em->method('getClassMetadata')->willReturn($classMetadata);
+
+        $provider = new DynamicDbProvider($em);
+        $config = $provider->findConnectionConfig('test_db');
+
+        $this->assertSame('pdo_mysql', $config['driver']);
+    }
+
+    public function testFindConnectionConfigUsesNameFieldIfConnectionNameAbsent(): void
+    {
+        $entity = new DummyConnectionEntity();
+        $em = $this->createMock(EntityManagerInterface::class);
+
+        $classMetadata = $this->createMock(ClassMetadata::class);
+        $classMetadata->method('getName')->willReturn(DummyConnectionEntity::class);
+        
+        // Mock hasField to return true only for name
+        $classMetadata->method('hasField')->willReturnCallback(function (string $fieldName) {
+            return $fieldName === 'name';
+        });
+
+        $metadataFactory = $this->createMock(ClassMetadataFactory::class);
+        $metadataFactory->method('getAllMetadata')->willReturn([$classMetadata]);
+
+        $repository = $this->createMock(EntityRepository::class);
+        $repository->expects($this->once())
+            ->method('findOneBy')
+            ->with(['name' => 'test_db'])
+            ->willReturn($entity);
+
+        $em->method('getMetadataFactory')->willReturn($metadataFactory);
+        $em->method('getRepository')->willReturn($repository);
+        $em->method('getClassMetadata')->willReturn($classMetadata);
+
+        $provider = new DynamicDbProvider($em);
+        $config = $provider->findConnectionConfig('test_db');
+
+        $this->assertSame('pdo_mysql', $config['driver']);
+    }
+
+    public function testFindConnectionConfigUsesIdFieldIfOthersAbsent(): void
+    {
+        $entity = new DummyConnectionEntity();
+        $em = $this->createMock(EntityManagerInterface::class);
+
+        $classMetadata = $this->createMock(ClassMetadata::class);
+        $classMetadata->method('getName')->willReturn(DummyConnectionEntity::class);
+        
+        // Mock hasField to return true only for id
+        $classMetadata->method('hasField')->willReturnCallback(function (string $fieldName) {
+            return $fieldName === 'id';
+        });
+
+        $metadataFactory = $this->createMock(ClassMetadataFactory::class);
+        $metadataFactory->method('getAllMetadata')->willReturn([$classMetadata]);
+
+        $repository = $this->createMock(EntityRepository::class);
+        $repository->expects($this->once())
+            ->method('findOneBy')
+            ->with(['id' => 'test_db'])
+            ->willReturn($entity);
+
+        $em->method('getMetadataFactory')->willReturn($metadataFactory);
+        $em->method('getRepository')->willReturn($repository);
+        $em->method('getClassMetadata')->willReturn($classMetadata);
+
+        $provider = new DynamicDbProvider($em);
+        $config = $provider->findConnectionConfig('test_db');
+
+        $this->assertSame('pdo_mysql', $config['driver']);
+    }
 }

@@ -2,16 +2,18 @@
 
 `DynamicDbBundle` is a Symfony bundle that allows you to store database connection configurations in a database table and seamlessly fetch and instantiate connections and entity managers at runtime.
 
-With this bundle, you can natively use `$doctrine->getConnection('dynamic_name')` just like any conventionally configured connection in your `doctrine.yaml`.
+With this bundle, you can natively use `$doctrine->getConnection('dynamic_name')` or `$doctrine->getManager('dynamic_name')` just like any conventionally configured connection in your `doctrine.yaml`.
 
 ---
 
 ## Features
 
 - **Seamless Doctrine Integration**: Fetches database configuration dynamically via Doctrine's `ManagerRegistry`.
-- **On-The-Fly Connections**: Creates connections and entity managers completely dynamically without requiring compile-time setup.
+- **Inherited ORM Configuration**: Dynamically boots new entity managers by automatically inheriting the configuration (metadata mapping drivers, naming strategies, custom functions, filters, etc.) of the default `EntityManager`. No need to redefine entity paths or configs.
+- **Dynamic Connection Discovery**: Extends standard `ManagerRegistry` lookup methods (`getConnections()`, `getConnectionNames()`, `getManagers()`, and `getManagerNames()`) to include dynamically created connections/managers alongside static ones.
+- **Universal Database Support**: Supports all database drivers supported by Doctrine DBAL (MySQL, PostgreSQL, SQLite, Oracle, SQL Server, etc.) via structured parameter mapping or DSN URLs.
 - **Auto Cache Rebuilding**: Automatically handles clearing the Symfony cache when your dynamic database connection entities are created, updated, or removed, ensuring any new connections are immediately discoverable.
-- **Runtime Secret Injection**: Allows the consumer application to supply the decryption secret via Symfony's DI container, which is automatically forwarded to the connection entity via `setSecret()` before the connection config is built.
+- **Runtime Secret Injection**: Allows the consumer application to supply a decryption secret via Symfony's DI container, which is automatically forwarded to the connection entity via `setSecret()` before the connection config is built.
 
 ---
 
@@ -74,7 +76,7 @@ class TenantConnection implements DynamicDbConnectionInterface
     // --- DynamicDbConnectionInterface implementation ---
 
     public function getConnectionName(): string { return $this->connectionName; }
-    public function getConnectionString(): ?string { return null; } // Optional: Return Oracle TNS string here
+    public function getConnectionString(): ?string { return null; } // Optional: Return DSN URL or Oracle TNS string here
     public function getDatabaseDriver(): string { return 'pdo_mysql'; } // Hardcode or map a column
     public function getDatabaseHost(): string { return $this->dbHost; }
     public function getDatabasePort(): int|string { return 3306; }
@@ -170,10 +172,15 @@ With this configuration, `DynamicDbProvider` will automatically call `$entity->s
 
 If no secret is needed, simply omit the binding — the `$secret` parameter defaults to `null` and `setSecret()` will not be called.
 
-### How it Works
-1. When you call `$doctrine->getConnection('X')`, the wrapped `DynamicRegistryDecorator` intercepts the request.
+---
+
+## How it Works
+
+1. When you call `$doctrine->getConnection('X')` or `$doctrine->getManager('X')`, the wrapped `DynamicRegistryDecorator` intercepts the request.
 2. If Doctrine natively doesn't know about connection `X`, `DynamicDbProvider` kicks in.
 3. It finds the class implementing `DynamicDbConnectionInterface` dynamically and uses the default EntityManager to fetch the entity matching `connectionName = 'X'`.
-4. If a `$secret` was configured (via DI), it calls `$entity->setSecret($secret)` on the fetched entity before building the config.
-5. The `DynamicEntityManagerFactory` boots up the new ORM connection using the config.
-6. The connection is cached locally for the remainder of the request.
+4. If a `$secret` was configured (via DI), it calls `$entity->setSecret($secret)` on the fetched entity.
+5. The `DynamicEntityManagerFactory` boots up the new ORM connection using the database connection parameters (or parses a DSN URL using Doctrine's `DsnParser`).
+6. The new dynamic `EntityManager` is instantiated by inheriting the exact configuration (metadata mappings, naming strategies, proxies, etc.) of the default `EntityManager`.
+7. Standard methods like `$doctrine->getConnections()` or `$doctrine->getManagers()` are decorated to dynamically include the newly instantiated connections/managers alongside the statically defined ones.
+8. The connection is cached locally for the remainder of the request.

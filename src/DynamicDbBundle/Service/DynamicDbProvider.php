@@ -33,12 +33,15 @@ class DynamicDbProvider
         $repository = $this->defaultEntityManager->getRepository($entityClass);
         $classMetadata = $this->defaultEntityManager->getClassMetadata($entityClass);
 
-        $searchField = 'id';
-        if (!$classMetadata->hasField($searchField) && $classMetadata->hasField('name')) {
-            $searchField = 'name';
+        $searchField = null;
+        foreach (['connectionName', 'name', 'id'] as $field) {
+            if ($classMetadata->hasField($field)) {
+                $searchField = $field;
+                break;
+            }
         }
 
-        if ($classMetadata->hasField($searchField)) {
+        if ($searchField !== null) {
             $entity = $repository->findOneBy([$searchField => $name]);
         } else {
             // Fallback: fetch all and iterate

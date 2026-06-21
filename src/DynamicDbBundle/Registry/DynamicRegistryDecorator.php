@@ -37,12 +37,22 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function getConnections(): array
     {
-        return $this->decorated->getConnections();
+        $connections = $this->decorated->getConnections();
+        foreach ($this->dynamicDbManager->getEntityManagers() as $name => $em) {
+            $connections[$name] = $em->getConnection();
+        }
+        return $connections;
     }
 
     public function getConnectionNames(): array
     {
-        return $this->decorated->getConnectionNames();
+        $names = $this->decorated->getConnectionNames();
+        foreach (array_keys($this->dynamicDbManager->getEntityManagers()) as $name) {
+            if (!in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        return $names;
     }
 
     public function getDefaultManagerName(): string
@@ -65,7 +75,11 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function getManagers(): array
     {
-        return $this->decorated->getManagers();
+        $managers = $this->decorated->getManagers();
+        foreach ($this->dynamicDbManager->getEntityManagers() as $name => $em) {
+            $managers[$name] = $em;
+        }
+        return $managers;
     }
 
     public function resetManager(string|null $name = null): ObjectManager
@@ -85,7 +99,13 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function getManagerNames(): array
     {
-        return $this->decorated->getManagerNames();
+        $names = $this->decorated->getManagerNames();
+        foreach (array_keys($this->dynamicDbManager->getEntityManagers()) as $name) {
+            if (!in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        return $names;
     }
 
     public function getRepository(string $persistentObject, string|null $persistentManagerName = null): ObjectRepository
