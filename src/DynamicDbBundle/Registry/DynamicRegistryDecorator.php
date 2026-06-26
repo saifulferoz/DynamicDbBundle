@@ -117,4 +117,14 @@ class DynamicRegistryDecorator implements ManagerRegistry
     {
         return $this->decorated->getManagerForClass($class);
     }
+
+    public function reset(): void
+    {
+        // Delegate to the decorated registry's reset() if available.
+        // Doctrine\Bundle\DoctrineBundle\Registry has this method and it is called
+        // by Symfony's ServicesResetter via the 'kernel.reset' tag on the 'doctrine' service.
+        if (method_exists($this->decorated, 'reset')) {
+            $this->decorated->reset();
+        }
+    }
 }
