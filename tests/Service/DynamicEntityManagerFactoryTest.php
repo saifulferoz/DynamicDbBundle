@@ -145,4 +145,50 @@ class DynamicEntityManagerFactoryTest extends TestCase
         $this->assertSame('myuser', $params['user']);
         $this->assertSame('mypass', $params['password']);
     }
+
+    /**
+     * Application-level driver names (postgresql, mariadb, pdooci, …) are not
+     * DBAL driver names; the factory must normalize them before DriverManager
+     * sees them.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('driverAliasProvider')]
+    public function testCreateEntityManagerNormalizesDriverAliases(string $alias, string $expected): void
+    {
+        $dbConfig = [
+            'driver' => $alias,
+            'host' => 'localhost',
+            'port' => 5432,
+            'dbName' => 'mydb',
+            'username' => 'user',
+            'password' => 'pass',
+        ];
+
+        $em = $this->factory->createEntityManager($dbConfig);
+
+        $this->assertSame($expected, $em->getConnection()->getParams()['driver']);
+    }
+
+    public static function driverAliasProvider(): array
+    {
+        return [
+            'postgresql' => ['postgresql', 'pdo_pgsql'],
+            'mariadb' => ['mariadb', 'pdo_mysql'],
+            'pdooci' => ['pdooci', 'pdo_oci'],
+            'sqlserver' => ['sqlserver', 'pdo_sqlsrv'],
+            'valid dbal name kept' => ['mysqli', 'mysqli'],
+            'case-insensitive' => ['PostgreSQL', 'pdo_pgsql'],
+        ];
+    }
+
+    public function testCreateEntityManagerRejectsNonDbalDrivers(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('not a Doctrine DBAL driver');
+
+        $this->factory->createEntityManager([
+            'driver' => 'bigquery',
+            'host' => 'my_dataset',
+            'dbName' => 'my-project',
+        ]);
+    }
 }
