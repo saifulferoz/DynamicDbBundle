@@ -113,7 +113,8 @@ class DynamicEntityManagerFactory
             $config = clone $config;
             $driver = new MappingDriverChain();
             foreach ($mappings as $mapping) {
-                $driver->addDriver(new AttributeDriver([$mapping['dir']]), $mapping['prefix']);
+                // Trailing separator keeps App\Entity\Analytics from also claiming App\Entity\AnalyticsX.
+                $driver->addDriver(new AttributeDriver([$mapping['dir']]), rtrim($mapping['prefix'], '\\').'\\');
             }
             $config->setMetadataDriverImpl($driver);
         }

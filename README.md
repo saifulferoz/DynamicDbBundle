@@ -9,7 +9,7 @@ With this bundle, you can natively use `$doctrine->getConnection('dynamic_name')
 ## Features
 
 - **Seamless Doctrine Integration**: Fetches database configuration dynamically via Doctrine's `ManagerRegistry`.
-- **Inherited ORM Configuration**: Dynamically boots new entity managers by automatically inheriting the configuration (metadata mapping drivers, naming strategies, custom functions, filters, etc.) of the default `EntityManager`. No need to redefine entity paths or configs.
+- **Inherited ORM Configuration**: Dynamically boots new entity managers by automatically inheriting the configuration (metadata mapping drivers, naming strategies, custom functions, filters, etc.) of the default `EntityManager`. No need to redefine entity paths or configs, unless you want a dynamic manager to map its own entities (see [Mapping Entities to a Dynamic Manager](#5-mapping-entities-to-a-dynamic-manager-optional)).
 - **Dynamic Connection Discovery**: Extends standard `ManagerRegistry` lookup methods (`getConnections()`, `getConnectionNames()`, `getManagers()`, and `getManagerNames()`) to include dynamically created connections/managers alongside static ones.
 - **Universal Database Support**: Supports all database drivers supported by Doctrine DBAL (MySQL, PostgreSQL, SQLite, Oracle, SQL Server, etc.) via structured parameter mapping or DSN URLs.
 - **Auto Cache Rebuilding**: Automatically handles clearing the Symfony cache when your dynamic database connection entities are created, updated, or removed, ensuring any new connections are immediately discoverable.
@@ -171,6 +171,23 @@ services:
 With this configuration, `DynamicDbProvider` will automatically call `$entity->setSecret($secret)` on the fetched connection entity before building the connection config, giving the entity access to the secret for custom decryption logic.
 
 If no secret is needed, simply omit the binding — the `$secret` parameter defaults to `null` and `setSecret()` will not be called.
+
+### 5. Mapping Entities to a Dynamic Manager (Optional)
+
+By default a dynamic `EntityManager` reuses the default EM's metadata driver. To give a dynamic manager its own entities (and let `getRepository()` / `getManagerForClass()` route those classes to it), configure attribute mappings per manager name:
+
+```yaml
+# config/packages/dynamic_db.yaml
+dynamic_db:
+    managers:
+        analytics:                       # the dynamic connection name
+            mappings:
+                - { dir: '%kernel.project_dir%/src/Entity/Analytics', prefix: 'App\Entity\Analytics' }
+```
+
+- When `mappings` is set, that manager uses **only** these attribute mappings; it no longer loads the default EM's entities.
+- `$doctrine->getRepository(Customer::class)` and `getManagerForClass()` resolve a class to the dynamic manager whose prefix covers it (the most specific prefix wins). Configured dynamic prefixes take precedence over static managers, so entities can live under the default `App\Entity` tree. If that dynamic connection can't be found, `getManagerForClass()` returns `null` rather than falling back to the default database.
+- The default EM still maps `src/Entity` recursively, so exclude the dynamic directory from your default mapping if schema tools on the default connection should ignore those entities.
 
 ---
 

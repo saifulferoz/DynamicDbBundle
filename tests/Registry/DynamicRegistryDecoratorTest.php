@@ -105,16 +105,35 @@ class DynamicRegistryDecoratorTest extends TestCase
         $this->assertSame(['default', 'dynamic_db'], $names);
     }
 
-    public function testGetManagerForClassPrefersStaticManager(): void
+    public function testResetManagerRebuildsDynamicManager(): void
+    {
+        $freshEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $this->dynamicDbManager->method('hasEntityManager')->with('analytics')->willReturn(true);
+        $this->dynamicDbManager->expects($this->once())->method('resetEntityManager')->with('analytics');
+        $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($freshEm);
+        $this->decorated->expects($this->never())->method('resetManager');
+
+        $this->assertSame($freshEm, $this->decorator->resetManager('analytics'));
+    }
+
+    public function testResetAlsoResetsDynamicManagers(): void
+    {
+        $this->dynamicDbManager->expects($this->once())->method('reset');
+
+        $this->decorator->reset();
+    }
+
+    public function testGetManagerForClassUsesStaticManagerWithoutDynamicMapping(): void
     {
         $staticEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
         $this->decorated->method('getManagerForClass')->willReturn($staticEm);
+        $this->dynamicDbManager->method('getManagerNameForClass')->willReturn(null);
         $this->dynamicDbManager->expects($this->never())->method('getEntityManager');
 
         $this->assertSame($staticEm, $this->decorator->getManagerForClass('App\\Entity\\User'));
     }
 
-    public function testGetManagerForClassFallsBackToDynamicManager(): void
+    public function testGetManagerForClassUsesDynamicManager(): void
     {
         $dynamicEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
         $this->decorated->method('getManagerForClass')->willReturn(null);
@@ -122,6 +141,26 @@ class DynamicRegistryDecoratorTest extends TestCase
         $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($dynamicEm);
 
         $this->assertSame($dynamicEm, $this->decorator->getManagerForClass('App\\Entity\\Analytics\\Customer'));
+    }
+
+    public function testGetManagerForClassPrefersDynamicMappingOverOverlappingStaticManager(): void
+    {
+        // The default EM maps App\Entity, so it would also claim App\Entity\Analytics\Customer.
+        $dynamicEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $this->decorated->expects($this->never())->method('getManagerForClass');
+        $this->dynamicDbManager->method('getManagerNameForClass')->willReturn('analytics');
+        $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($dynamicEm);
+
+        $this->assertSame($dynamicEm, $this->decorator->getManagerForClass('App\\Entity\\Analytics\\Customer'));
+    }
+
+    public function testGetManagerForClassReturnsNullWhenDynamicConnectionIsUnavailable(): void
+    {
+        $this->decorated->expects($this->never())->method('getManagerForClass');
+        $this->dynamicDbManager->method('getManagerNameForClass')->willReturn('analytics');
+        $this->dynamicDbManager->method('getEntityManager')->willThrowException(new \InvalidArgumentException());
+
+        $this->assertNull($this->decorator->getManagerForClass('App\\Entity\\Analytics\\Customer'));
     }
 
     public function testGetManagerForClassReturnsNullForUnknownClass(): void

@@ -202,7 +202,8 @@ class DynamicEntityManagerFactoryTest extends TestCase
         $this->assertNotSame($this->configuration, $em->getConfiguration());
         $driver = $em->getConfiguration()->getMetadataDriverImpl();
         $this->assertInstanceOf(\Doctrine\Persistence\Mapping\Driver\MappingDriverChain::class, $driver);
-        $this->assertArrayHasKey('App\\Entity\\Analytics', $driver->getDrivers());
+        $this->assertArrayHasKey('App\\Entity\\Analytics\\', $driver->getDrivers());
+        $this->assertTrue($driver->isTransient('App\\Entity\\AnalyticsArchive\\Foo'));
         // the default EM's configuration is left untouched
         $this->assertNotInstanceOf(\Doctrine\Persistence\Mapping\Driver\MappingDriverChain::class, $this->configuration->getMetadataDriverImpl());
     }

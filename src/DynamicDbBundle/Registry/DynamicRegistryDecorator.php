@@ -84,6 +84,12 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function resetManager(string|null $name = null): ObjectManager
     {
+        if ($name !== null && $this->dynamicDbManager->hasEntityManager($name)) {
+            $this->dynamicDbManager->resetEntityManager($name);
+
+            return $this->dynamicDbManager->getEntityManager($name);
+        }
+
         return $this->decorated->resetManager($name);
     }
 
@@ -119,14 +125,21 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function getManagerForClass(string $class): ?ObjectManager
     {
-        $manager = $this->decorated->getManagerForClass($class);
-        if ($manager !== null) {
-            return $manager;
+        // Dynamic mappings are checked first: they are the more specific configuration, and a
+        // static AttributeDriver claims every #[Entity] under its prefix regardless of directory
+        // (e.g. App\Entity covering App\Entity\Analytics).
+        $name = $this->dynamicDbManager->getManagerNameForClass($class);
+        if ($name === null) {
+            return $this->decorated->getManagerForClass($class);
         }
 
-        $name = $this->dynamicDbManager->getManagerNameForClass($class);
-
-        return $name !== null ? $this->dynamicDbManager->getEntityManager($name) : null;
+        try {
+            return $this->dynamicDbManager->getEntityManager($name);
+        } catch (\InvalidArgumentException) {
+            // The class belongs to a dynamic manager whose connection is unavailable; don't route
+            // it to a static manager (wrong database), and honour the nullable contract.
+            return null;
+        }
     }
 
     public function reset(): void
@@ -137,5 +150,8 @@ class DynamicRegistryDecorator implements ManagerRegistry
         if (method_exists($this->decorated, 'reset')) {
             $this->decorated->reset();
         }
+
+        // Drop dynamic EMs too, so a closed one is rebuilt instead of reused forever.
+        $this->dynamicDbManager->reset();
     }
 }

@@ -14,11 +14,10 @@ class DynamicDbExtension extends Extension
     {
         $config = $this->processConfiguration(new Configuration(), $configs);
 
-        $mappings = [];
-        foreach ($config['managers'] ?? [] as $name => $manager) {
-            $mappings[$name] = $manager['mappings'];
-        }
-        $container->setParameter('dynamic_db.mappings', $mappings);
+        $container->setParameter('dynamic_db.mappings', array_map(
+            static fn (array $manager): array => $manager['mappings'],
+            $config['managers']
+        ));
 
         $loader = new YamlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('services.yaml');

@@ -3,6 +3,7 @@
 namespace Feroz\DynamicDbBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\Proxy;
 use Feroz\DynamicDbBundle\Service\DynamicDbProvider;
 
 class DynamicDbManager
@@ -43,20 +44,48 @@ class DynamicDbManager
     }
 
     /**
-     * Name of the dynamic manager whose configured mapping prefix covers $class, or null.
+     * Name of the dynamic manager whose configured mapping prefix covers $class (the most
+     * specific prefix wins; Doctrine proxy classes resolve to their entity), or null.
      */
     public function getManagerNameForClass(string $class): ?string
     {
         $class = ltrim($class, '\\');
+        $pos = strrpos($class, '\\'.Proxy::MARKER.'\\');
+        if ($pos !== false) {
+            $class = substr($class, $pos + Proxy::MARKER_LENGTH + 2);
+        }
+
+        $match = null;
+        $matchLength = 0;
         foreach ($this->mappings as $name => $mappings) {
             foreach ($mappings as $mapping) {
-                if (str_starts_with($class, rtrim($mapping['prefix'], '\\').'\\')) {
-                    return $name;
+                $prefix = rtrim($mapping['prefix'], '\\').'\\';
+                if (strlen($prefix) > $matchLength && str_starts_with($class, $prefix)) {
+                    $match = $name;
+                    $matchLength = strlen($prefix);
                 }
             }
         }
 
-        return null;
+        return $match;
+    }
+
+    /**
+     * Drops a cached dynamic EM (closing its connection) so the next getEntityManager() builds a fresh one.
+     */
+    public function resetEntityManager(string $name): void
+    {
+        if (isset($this->entityManagers[$name])) {
+            $this->entityManagers[$name]->getConnection()->close();
+            unset($this->entityManagers[$name]);
+        }
+    }
+
+    public function reset(): void
+    {
+        foreach (array_keys($this->entityManagers) as $name) {
+            $this->resetEntityManager($name);
+        }
     }
 
     public function hasEntityManager(string $name): bool
