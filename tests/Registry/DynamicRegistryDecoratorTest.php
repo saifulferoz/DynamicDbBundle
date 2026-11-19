@@ -154,4 +154,17 @@ class DynamicRegistryDecoratorTest extends TestCase
 
         $this->assertSame($repository, $this->decorator->getRepository('App\\Entity\\Analytics\\Customer', 'analytics'));
     }
+
+    public function testGetRepositoryFallsBackToDefaultManagerWithoutMappings(): void
+    {
+        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $defaultEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $defaultEm->method('getRepository')->with('Foo\\Bar')->willReturn($repository);
+        $this->decorated->method('getManagerForClass')->willReturn(null);
+        $this->decorated->method('getManager')->with(null)->willReturn($defaultEm);
+        $this->dynamicDbManager->method('getManagerNameForClass')->willReturn(null);
+        $this->dynamicDbManager->expects($this->never())->method('getEntityManager');
+
+        $this->assertSame($repository, $this->decorator->getRepository('Foo\\Bar'));
+    }
 }
