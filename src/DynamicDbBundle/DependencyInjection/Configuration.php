@@ -13,9 +13,9 @@ class Configuration implements ConfigurationInterface
 
         // dynamic_db:
         //     managers:
-        //         warehouse:
+        //         analytics:
         //             mappings:
-        //                 - { dir: '%kernel.project_dir%/src/Entity/WareHouse', prefix: 'App\Entity\WareHouse' }
+        //                 - { dir: '%kernel.project_dir%/src/Entity/Analytics', prefix: 'App\Entity\Analytics' }
         $treeBuilder->getRootNode()
             ->children()
                 ->arrayNode('managers')
