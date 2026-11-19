@@ -15,10 +15,22 @@ services:
     arguments:
       $mappings: '%dynamic_db.mappings%'
 
-  # DoctrineBundle's provider requires AbstractManagerRegistry, which the decorator is not.
-  # Decorating (rather than redefining the id) works regardless of bundle registration order.
+  # DoctrineBundle's DBAL connection provider (used by dbal:run-sql and doctrine:query:sql) either
+  # type-hints AbstractManagerRegistry, which the decorator is not (3.x: TypeError), or is built
+  # from an inline copy of the undecorated registry (2.x: dynamic connections are invisible).
+  # Replace it with one that goes through "doctrine". It is registered under a different id per
+  # major version, so decorate both; decorating works regardless of bundle registration order.
   Feroz\DynamicDbBundle\Dbal\RegistryConnectionProvider:
+    # DoctrineBundle 3.x
     decorates: doctrine.manager_registry_aware_connection_provider
+    decoration_on_invalid: ignore
+    arguments:
+      $managerRegistry: '@doctrine'
+
+  dynamic_db.dbal.connection_provider.doctrine_bundle_2:
+    class: Feroz\DynamicDbBundle\Dbal\RegistryConnectionProvider
+    # DoctrineBundle 2.x
+    decorates: Doctrine\Bundle\DoctrineBundle\Dbal\ManagerRegistryAwareConnectionProvider
     decoration_on_invalid: ignore
     arguments:
       $managerRegistry: '@doctrine'

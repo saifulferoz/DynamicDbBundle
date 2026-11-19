@@ -12,14 +12,14 @@ With this bundle, you can natively use `$doctrine->getConnection('dynamic_name')
 - **Inherited ORM Configuration**: Dynamically boots new entity managers by automatically inheriting the configuration (metadata mapping drivers, naming strategies, custom functions, filters, etc.) of the default `EntityManager`. No need to redefine entity paths or configs, unless you want a dynamic manager to map its own entities (see [Mapping Entities to a Dynamic Manager](#5-mapping-entities-to-a-dynamic-manager-optional)).
 - **Dynamic Connection Discovery**: Extends standard `ManagerRegistry` lookup methods (`getConnections()`, `getConnectionNames()`, `getManagers()`, and `getManagerNames()`) to include dynamically created connections/managers alongside static ones.
 - **Universal Database Support**: Supports all database drivers supported by Doctrine DBAL (MySQL, PostgreSQL, SQLite, Oracle, SQL Server, etc.) via structured parameter mapping or DSN URLs.
-- **Auto Cache Rebuilding**: Automatically handles clearing the Symfony cache when your dynamic database connection entities are created, updated, or removed, ensuring any new connections are immediately discoverable.
+- **Console Support**: DBAL console commands such as `dbal:run-sql --connection=<name>` and `doctrine:query:sql` work with dynamic connections (DoctrineBundle 2.x and 3.x).
 - **Runtime Secret Injection**: Allows the consumer application to supply a decryption secret via Symfony's DI container, which is automatically forwarded to the connection entity via `setSecret()` before the connection config is built.
 
 ---
 
 ## Installation
 
-Add the bundle to your project via Composer (if published):
+Add the bundle to your project via Composer:
 ```bash
 composer require feroz/dynamic-db-bundle
 ```
