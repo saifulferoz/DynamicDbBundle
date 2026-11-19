@@ -67,4 +67,65 @@ class DynamicDbManagerTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->manager->getEntityManager('invalid_db');
     }
+
+    public function testGetEntityManagerPassesConfiguredMappings(): void
+    {
+        $mappings = ['analytics' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Analytics']]];
+        $manager = new DynamicDbManager($this->factory, $this->provider, $mappings);
+        $config = ['driver' => 'pdo_pgsql'];
+
+        $this->factory->expects($this->once())
+            ->method('createEntityManager')
+            ->with($config, $mappings['analytics'])
+            ->willReturn($this->createMock(EntityManagerInterface::class));
+
+        $manager->getEntityManager('analytics', $config);
+    }
+
+    public function testGetManagerNameForClassMatchesPrefix(): void
+    {
+        $manager = new DynamicDbManager($this->factory, $this->provider, [
+            'analytics' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Analytics']],
+            'archive' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Archive\\']],
+        ]);
+
+        $this->assertSame('analytics', $manager->getManagerNameForClass('App\\Entity\\Analytics\\Customer'));
+        $this->assertSame('archive', $manager->getManagerNameForClass('\\App\\Entity\\Archive\\Customer'));
+        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\AnalyticsX\\Customer'));
+        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\User'));
+    }
+
+    public function testResetEntityManagerClosesConnectionAndDropsCache(): void
+    {
+        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection->expects($this->once())->method('close');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getConnection')->willReturn($connection);
+        $this->factory->method('createEntityManager')->willReturn($em);
+
+        $this->manager->getEntityManager('analytics', ['driver' => 'pdo_sqlite']);
+        $this->manager->reset();
+
+        $this->assertFalse($this->manager->hasEntityManager('analytics'));
+    }
+
+    public function testGetManagerNameForClassPrefersMostSpecificPrefix(): void
+    {
+        $manager = new DynamicDbManager($this->factory, $this->provider, [
+            'analytics' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Analytics']],
+            'archive' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Analytics\\Archive']],
+        ]);
+
+        $this->assertSame('archive', $manager->getManagerNameForClass('App\\Entity\\Analytics\\Archive\\Log'));
+        $this->assertSame('analytics', $manager->getManagerNameForClass('App\\Entity\\Analytics\\Customer'));
+    }
+
+    public function testGetManagerNameForClassResolvesProxyClass(): void
+    {
+        $manager = new DynamicDbManager($this->factory, $this->provider, [
+            'analytics' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Analytics']],
+        ]);
+
+        $this->assertSame('analytics', $manager->getManagerNameForClass('Proxies\\__CG__\\App\\Entity\\Analytics\\Customer'));
+    }
 }

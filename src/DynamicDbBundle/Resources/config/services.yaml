@@ -9,3 +9,16 @@ services:
     autowire: true
     arguments:
       $decorated: '@.inner'
+
+  Feroz\DynamicDbBundle\Service\DynamicDbManager:
+    autowire: true
+    arguments:
+      $mappings: '%dynamic_db.mappings%'
+
+  # DoctrineBundle's provider requires AbstractManagerRegistry, which the decorator is not.
+  # Decorating (rather than redefining the id) works regardless of bundle registration order.
+  Feroz\DynamicDbBundle\Dbal\RegistryConnectionProvider:
+    decorates: doctrine.manager_registry_aware_connection_provider
+    decoration_on_invalid: ignore
+    arguments:
+      $managerRegistry: '@doctrine'

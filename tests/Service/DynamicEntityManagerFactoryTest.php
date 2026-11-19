@@ -191,4 +191,20 @@ class DynamicEntityManagerFactoryTest extends TestCase
             'dbName' => 'my-project',
         ]);
     }
+
+    public function testCreateEntityManagerWithMappingsUsesOwnMetadataDriver(): void
+    {
+        $em = $this->factory->createEntityManager(
+            ['driver' => 'pdo_sqlite', 'dbName' => ':memory:'],
+            [['dir' => __DIR__, 'prefix' => 'App\\Entity\\Analytics']]
+        );
+
+        $this->assertNotSame($this->configuration, $em->getConfiguration());
+        $driver = $em->getConfiguration()->getMetadataDriverImpl();
+        $this->assertInstanceOf(\Doctrine\Persistence\Mapping\Driver\MappingDriverChain::class, $driver);
+        $this->assertArrayHasKey('App\\Entity\\Analytics\\', $driver->getDrivers());
+        $this->assertTrue($driver->isTransient('App\\Entity\\AnalyticsArchive\\Foo'));
+        // the default EM's configuration is left untouched
+        $this->assertNotInstanceOf(\Doctrine\Persistence\Mapping\Driver\MappingDriverChain::class, $this->configuration->getMetadataDriverImpl());
+    }
 }

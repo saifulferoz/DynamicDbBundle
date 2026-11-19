@@ -6,6 +6,8 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\Driver\AttributeDriver;
+use Doctrine\Persistence\Mapping\Driver\MappingDriverChain;
 
 class DynamicEntityManagerFactory
 {
@@ -46,7 +48,7 @@ class DynamicEntityManagerFactory
     ) {
     }
 
-    public function createEntityManager(array $dbConfig): EntityManagerInterface
+    public function createEntityManager(array $dbConfig, array $mappings = []): EntityManagerInterface
     {
         $connectionParams = [];
 
@@ -105,6 +107,17 @@ class DynamicEntityManagerFactory
         }
 
         $config = $this->defaultEntityManager->getConfiguration();
+
+        if ($mappings !== []) {
+            // Same settings as the default EM, but this manager maps its own entities.
+            $config = clone $config;
+            $driver = new MappingDriverChain();
+            foreach ($mappings as $mapping) {
+                // Trailing separator keeps App\Entity\Analytics from also claiming App\Entity\AnalyticsX.
+                $driver->addDriver(new AttributeDriver([$mapping['dir']]), rtrim($mapping['prefix'], '\\').'\\');
+            }
+            $config->setMetadataDriverImpl($driver);
+        }
 
         return new EntityManager(DriverManager::getConnection($connectionParams, $config), $config);
     }
