@@ -12,13 +12,9 @@ class DynamicDbManager
      */
     private array $entityManagers = [];
 
-    /**
-     * @param array<string, list<array{dir: string, prefix: string}>> $mappings entity mappings per dynamic manager name
-     */
     public function __construct(
         private DynamicEntityManagerFactory $factory,
-        private ?DynamicDbProvider $provider = null,
-        private array $mappings = []
+        private ?DynamicDbProvider $provider = null
     ) {
     }
 
@@ -36,27 +32,10 @@ class DynamicDbManager
             throw new \InvalidArgumentException(sprintf('Dynamic database connection "%s" not found and no configuration provided.', $name));
         }
 
-        $entityManager = $this->factory->createEntityManager($dbConfig, $this->mappings[$name] ?? []);
+        $entityManager = $this->factory->createEntityManager($dbConfig);
         $this->entityManagers[$name] = $entityManager;
 
         return $entityManager;
-    }
-
-    /**
-     * Name of the dynamic manager whose configured mapping prefix covers $class, or null.
-     */
-    public function getManagerNameForClass(string $class): ?string
-    {
-        $class = ltrim($class, '\\');
-        foreach ($this->mappings as $name => $mappings) {
-            foreach ($mappings as $mapping) {
-                if (str_starts_with($class, rtrim($mapping['prefix'], '\\').'\\')) {
-                    return $name;
-                }
-            }
-        }
-
-        return null;
     }
 
     public function hasEntityManager(string $name): bool
