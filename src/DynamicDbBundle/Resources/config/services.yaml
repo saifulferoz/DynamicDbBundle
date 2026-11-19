@@ -9,3 +9,14 @@ services:
     autowire: true
     arguments:
       $decorated: '@.inner'
+
+  Feroz\DynamicDbBundle\Service\DynamicDbManager:
+    autowire: true
+    arguments:
+      $mappings: '%dynamic_db.mappings%'
+
+  # DoctrineBundle's provider requires AbstractManagerRegistry, which the decorator is not.
+  doctrine.manager_registry_aware_connection_provider:
+    class: Feroz\DynamicDbBundle\Dbal\RegistryConnectionProvider
+    arguments:
+      $managerRegistry: '@doctrine'

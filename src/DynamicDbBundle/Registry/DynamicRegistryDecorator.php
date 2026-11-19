@@ -110,12 +110,23 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function getRepository(string $persistentObject, string|null $persistentManagerName = null): ObjectRepository
     {
-        return $this->decorated->getRepository($persistentObject, $persistentManagerName);
+        if ($persistentManagerName !== null) {
+            return $this->getManager($persistentManagerName)->getRepository($persistentObject);
+        }
+
+        return ($this->getManagerForClass($persistentObject) ?? $this->getManager())->getRepository($persistentObject);
     }
 
     public function getManagerForClass(string $class): ?ObjectManager
     {
-        return $this->decorated->getManagerForClass($class);
+        $manager = $this->decorated->getManagerForClass($class);
+        if ($manager !== null) {
+            return $manager;
+        }
+
+        $name = $this->dynamicDbManager->getManagerNameForClass($class);
+
+        return $name !== null ? $this->dynamicDbManager->getEntityManager($name) : null;
     }
 
     public function reset(): void

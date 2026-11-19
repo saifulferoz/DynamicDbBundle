@@ -67,4 +67,31 @@ class DynamicDbManagerTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->manager->getEntityManager('invalid_db');
     }
+
+    public function testGetEntityManagerPassesConfiguredMappings(): void
+    {
+        $mappings = ['warehouse' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\WareHouse']]];
+        $manager = new DynamicDbManager($this->factory, $this->provider, $mappings);
+        $config = ['driver' => 'pdo_pgsql'];
+
+        $this->factory->expects($this->once())
+            ->method('createEntityManager')
+            ->with($config, $mappings['warehouse'])
+            ->willReturn($this->createMock(EntityManagerInterface::class));
+
+        $manager->getEntityManager('warehouse', $config);
+    }
+
+    public function testGetManagerNameForClassMatchesPrefix(): void
+    {
+        $manager = new DynamicDbManager($this->factory, $this->provider, [
+            'warehouse' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\WareHouse']],
+            'microfin' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Microfin\\']],
+        ]);
+
+        $this->assertSame('warehouse', $manager->getManagerNameForClass('App\\Entity\\WareHouse\\Office'));
+        $this->assertSame('microfin', $manager->getManagerNameForClass('\\App\\Entity\\Microfin\\Office'));
+        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\WareHouseX\\Office'));
+        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\Main\\User'));
+    }
 }
