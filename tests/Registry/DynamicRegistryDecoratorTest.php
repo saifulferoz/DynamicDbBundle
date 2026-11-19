@@ -111,17 +111,17 @@ class DynamicRegistryDecoratorTest extends TestCase
         $this->decorated->method('getManagerForClass')->willReturn($staticEm);
         $this->dynamicDbManager->expects($this->never())->method('getEntityManager');
 
-        $this->assertSame($staticEm, $this->decorator->getManagerForClass('App\\Entity\\Main\\User'));
+        $this->assertSame($staticEm, $this->decorator->getManagerForClass('App\\Entity\\User'));
     }
 
     public function testGetManagerForClassFallsBackToDynamicManager(): void
     {
         $dynamicEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
         $this->decorated->method('getManagerForClass')->willReturn(null);
-        $this->dynamicDbManager->method('getManagerNameForClass')->with('App\\Entity\\WareHouse\\Office')->willReturn('warehouse');
-        $this->dynamicDbManager->method('getEntityManager')->with('warehouse')->willReturn($dynamicEm);
+        $this->dynamicDbManager->method('getManagerNameForClass')->with('App\\Entity\\Analytics\\Customer')->willReturn('analytics');
+        $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($dynamicEm);
 
-        $this->assertSame($dynamicEm, $this->decorator->getManagerForClass('App\\Entity\\WareHouse\\Office'));
+        $this->assertSame($dynamicEm, $this->decorator->getManagerForClass('App\\Entity\\Analytics\\Customer'));
     }
 
     public function testGetManagerForClassReturnsNullForUnknownClass(): void
@@ -136,12 +136,12 @@ class DynamicRegistryDecoratorTest extends TestCase
     {
         $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
         $dynamicEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
-        $dynamicEm->method('getRepository')->with('App\\Entity\\WareHouse\\Office')->willReturn($repository);
+        $dynamicEm->method('getRepository')->with('App\\Entity\\Analytics\\Customer')->willReturn($repository);
         $this->decorated->method('getManagerForClass')->willReturn(null);
-        $this->dynamicDbManager->method('getManagerNameForClass')->willReturn('warehouse');
-        $this->dynamicDbManager->method('getEntityManager')->with('warehouse')->willReturn($dynamicEm);
+        $this->dynamicDbManager->method('getManagerNameForClass')->willReturn('analytics');
+        $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($dynamicEm);
 
-        $this->assertSame($repository, $this->decorator->getRepository('App\\Entity\\WareHouse\\Office'));
+        $this->assertSame($repository, $this->decorator->getRepository('App\\Entity\\Analytics\\Customer'));
     }
 
     public function testGetRepositoryWithDynamicManagerName(): void
@@ -149,9 +149,9 @@ class DynamicRegistryDecoratorTest extends TestCase
         $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
         $dynamicEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
         $dynamicEm->method('getRepository')->willReturn($repository);
-        $this->decorated->method('getManager')->with('warehouse')->willThrowException(new \InvalidArgumentException());
-        $this->dynamicDbManager->method('getEntityManager')->with('warehouse')->willReturn($dynamicEm);
+        $this->decorated->method('getManager')->with('analytics')->willThrowException(new \InvalidArgumentException());
+        $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($dynamicEm);
 
-        $this->assertSame($repository, $this->decorator->getRepository('App\\Entity\\WareHouse\\Office', 'warehouse'));
+        $this->assertSame($repository, $this->decorator->getRepository('App\\Entity\\Analytics\\Customer', 'analytics'));
     }
 }

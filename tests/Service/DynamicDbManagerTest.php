@@ -70,28 +70,28 @@ class DynamicDbManagerTest extends TestCase
 
     public function testGetEntityManagerPassesConfiguredMappings(): void
     {
-        $mappings = ['warehouse' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\WareHouse']]];
+        $mappings = ['analytics' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Analytics']]];
         $manager = new DynamicDbManager($this->factory, $this->provider, $mappings);
         $config = ['driver' => 'pdo_pgsql'];
 
         $this->factory->expects($this->once())
             ->method('createEntityManager')
-            ->with($config, $mappings['warehouse'])
+            ->with($config, $mappings['analytics'])
             ->willReturn($this->createMock(EntityManagerInterface::class));
 
-        $manager->getEntityManager('warehouse', $config);
+        $manager->getEntityManager('analytics', $config);
     }
 
     public function testGetManagerNameForClassMatchesPrefix(): void
     {
         $manager = new DynamicDbManager($this->factory, $this->provider, [
-            'warehouse' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\WareHouse']],
-            'microfin' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Microfin\\']],
+            'analytics' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Analytics']],
+            'archive' => [['dir' => '/tmp', 'prefix' => 'App\\Entity\\Archive\\']],
         ]);
 
-        $this->assertSame('warehouse', $manager->getManagerNameForClass('App\\Entity\\WareHouse\\Office'));
-        $this->assertSame('microfin', $manager->getManagerNameForClass('\\App\\Entity\\Microfin\\Office'));
-        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\WareHouseX\\Office'));
-        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\Main\\User'));
+        $this->assertSame('analytics', $manager->getManagerNameForClass('App\\Entity\\Analytics\\Customer'));
+        $this->assertSame('archive', $manager->getManagerNameForClass('\\App\\Entity\\Archive\\Customer'));
+        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\AnalyticsX\\Customer'));
+        $this->assertNull($manager->getManagerNameForClass('App\\Entity\\User'));
     }
 }
