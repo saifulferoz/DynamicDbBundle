@@ -46,11 +46,10 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function getConnectionNames(): array
     {
+        // Doctrine returns name => service id; dynamic connections have no service, so use the name.
         $names = $this->decorated->getConnectionNames();
         foreach (array_keys($this->dynamicDbManager->getEntityManagers()) as $name) {
-            if (!in_array($name, $names, true)) {
-                $names[] = $name;
-            }
+            $names[$name] ??= $name;
         }
         return $names;
     }
@@ -84,7 +83,8 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function resetManager(string|null $name = null): ObjectManager
     {
-        if ($name !== null && $this->dynamicDbManager->hasEntityManager($name)) {
+        // Any non-static name is dynamic, whether or not it has been loaded yet.
+        if ($name !== null && !array_key_exists($name, $this->decorated->getManagerNames())) {
             $this->dynamicDbManager->resetEntityManager($name);
 
             return $this->dynamicDbManager->getEntityManager($name);
@@ -105,22 +105,24 @@ class DynamicRegistryDecorator implements ManagerRegistry
 
     public function getManagerNames(): array
     {
+        // Doctrine returns name => service id; dynamic managers have no service, so use the name.
         $names = $this->decorated->getManagerNames();
         foreach (array_keys($this->dynamicDbManager->getEntityManagers()) as $name) {
-            if (!in_array($name, $names, true)) {
-                $names[] = $name;
-            }
+            $names[$name] ??= $name;
         }
         return $names;
     }
 
     public function getRepository(string $persistentObject, string|null $persistentManagerName = null): ObjectRepository
     {
+        // A dynamically mapped class must never fall back to the default manager (wrong database):
+        // resolve its manager by name so an unavailable connection throws instead.
+        $persistentManagerName ??= $this->dynamicDbManager->getManagerNameForClass($persistentObject);
         if ($persistentManagerName !== null) {
             return $this->getManager($persistentManagerName)->getRepository($persistentObject);
         }
 
-        return ($this->getManagerForClass($persistentObject) ?? $this->getManager())->getRepository($persistentObject);
+        return ($this->decorated->getManagerForClass($persistentObject) ?? $this->getManager())->getRepository($persistentObject);
     }
 
     public function getManagerForClass(string $class): ?ObjectManager

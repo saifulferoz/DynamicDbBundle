@@ -13,18 +13,22 @@ class DynamicDbProvider
     ) {
     }
 
+    /** Connection entity class; false once looked up and none exists. */
+    private string|false|null $entityClass = null;
+
     public function findConnectionConfig(string $name): ?array
     {
-        $metadataFactory = $this->defaultEntityManager->getMetadataFactory();
-        $allMetadata = $metadataFactory->getAllMetadata();
-
-        $entityClass = null;
-        foreach ($allMetadata as $metadata) {
-            if (is_subclass_of($metadata->getName(), DynamicDbConnectionInterface::class)) {
-                $entityClass = $metadata->getName();
-                break;
+        // Loading all metadata is expensive and the answer can't change at runtime, so do it once.
+        if ($this->entityClass === null) {
+            $this->entityClass = false;
+            foreach ($this->defaultEntityManager->getMetadataFactory()->getAllMetadata() as $metadata) {
+                if (is_subclass_of($metadata->getName(), DynamicDbConnectionInterface::class)) {
+                    $this->entityClass = $metadata->getName();
+                    break;
+                }
             }
         }
+        $entityClass = $this->entityClass;
 
         if (!$entityClass) {
             return null;

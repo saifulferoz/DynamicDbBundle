@@ -14,6 +14,11 @@ class DynamicDbManager
     private array $entityManagers = [];
 
     /**
+     * @var array<string, string> normalized mapping prefix (with trailing "\") => manager name, longest first
+     */
+    private array $prefixes = [];
+
+    /**
      * @param array<string, list<array{dir: string, prefix: string}>> $mappings entity mappings per dynamic manager name
      */
     public function __construct(
@@ -21,6 +26,13 @@ class DynamicDbManager
         private ?DynamicDbProvider $provider = null,
         private array $mappings = []
     ) {
+        foreach ($mappings as $name => $managerMappings) {
+            foreach ($managerMappings as $mapping) {
+                $this->prefixes[rtrim($mapping['prefix'], '\\').'\\'] ??= $name;
+            }
+        }
+        // Longest (most specific) prefix first, so the first match wins.
+        uksort($this->prefixes, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
     }
 
     public function getEntityManager(string $name, array $dbConfig = []): EntityManagerInterface
@@ -55,19 +67,13 @@ class DynamicDbManager
             $class = substr($class, $pos + Proxy::MARKER_LENGTH + 2);
         }
 
-        $match = null;
-        $matchLength = 0;
-        foreach ($this->mappings as $name => $mappings) {
-            foreach ($mappings as $mapping) {
-                $prefix = rtrim($mapping['prefix'], '\\').'\\';
-                if (strlen($prefix) > $matchLength && str_starts_with($class, $prefix)) {
-                    $match = $name;
-                    $matchLength = strlen($prefix);
-                }
+        foreach ($this->prefixes as $prefix => $name) {
+            if (str_starts_with($class, $prefix)) {
+                return $name;
             }
         }
 
-        return $match;
+        return null;
     }
 
     /**
@@ -81,10 +87,18 @@ class DynamicDbManager
         }
     }
 
+    /**
+     * Like DoctrineBundle's Registry::reset(): open managers are cleared and kept, so services
+     * holding them stay in sync; only closed managers are dropped and rebuilt on next use.
+     */
     public function reset(): void
     {
-        foreach (array_keys($this->entityManagers) as $name) {
-            $this->resetEntityManager($name);
+        foreach ($this->entityManagers as $name => $entityManager) {
+            if ($entityManager->isOpen()) {
+                $entityManager->clear();
+            } else {
+                $this->resetEntityManager($name);
+            }
         }
     }
 
