@@ -71,13 +71,13 @@ class DynamicRegistryDecoratorTest extends TestCase
 
     public function testGetConnectionNamesIncludesDynamicNames(): void
     {
-        $this->decorated->method('getConnectionNames')->willReturn(['default']);
+        $this->decorated->method('getConnectionNames')->willReturn(['default' => 'doctrine.dbal.default_connection']);
         
         $em = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
         $this->dynamicDbManager->method('getEntityManagers')->willReturn(['dynamic_db' => $em]);
         
         $names = $this->decorator->getConnectionNames();
-        $this->assertSame(['default', 'dynamic_db'], $names);
+        $this->assertSame(['default' => 'doctrine.dbal.default_connection', 'dynamic_db' => 'dynamic_db'], $names);
     }
 
     public function testGetManagersMergesDynamicManagers(): void
@@ -96,13 +96,14 @@ class DynamicRegistryDecoratorTest extends TestCase
 
     public function testGetManagerNamesIncludesDynamicNames(): void
     {
-        $this->decorated->method('getManagerNames')->willReturn(['default']);
+        $this->decorated->method('getManagerNames')->willReturn(['default' => 'doctrine.orm.default_entity_manager']);
         
         $em = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
-        $this->dynamicDbManager->method('getEntityManagers')->willReturn(['dynamic_db' => $em]);
+        $this->dynamicDbManager->method('getEntityManagers')->willReturn(['dynamic_db' => $em, 'default' => $em]);
         
         $names = $this->decorator->getManagerNames();
-        $this->assertSame(['default', 'dynamic_db'], $names);
+        // keyed by name like Doctrine's registry; a static name is never overwritten
+        $this->assertSame(['default' => 'doctrine.orm.default_entity_manager', 'dynamic_db' => 'dynamic_db'], $names);
     }
 
     public function testResetManagerRebuildsDynamicManager(): void
@@ -176,11 +177,43 @@ class DynamicRegistryDecoratorTest extends TestCase
         $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
         $dynamicEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
         $dynamicEm->method('getRepository')->with('App\\Entity\\Analytics\\Customer')->willReturn($repository);
-        $this->decorated->method('getManagerForClass')->willReturn(null);
+        $this->decorated->method('getManager')->with('analytics')->willThrowException(new \InvalidArgumentException());
         $this->dynamicDbManager->method('getManagerNameForClass')->willReturn('analytics');
         $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($dynamicEm);
 
         $this->assertSame($repository, $this->decorator->getRepository('App\\Entity\\Analytics\\Customer'));
+    }
+
+    public function testGetRepositoryThrowsInsteadOfUsingDefaultManagerWhenDynamicConnectionIsUnavailable(): void
+    {
+        $this->decorated->method('getManager')->with('analytics')->willThrowException(new \InvalidArgumentException());
+        $this->decorated->expects($this->never())->method('getManagerForClass');
+        $this->dynamicDbManager->method('getManagerNameForClass')->willReturn('analytics');
+        $this->dynamicDbManager->method('getEntityManager')->willThrowException(new \InvalidArgumentException());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->decorator->getRepository('App\\Entity\\Analytics\\Customer');
+    }
+
+    public function testResetManagerBuildsConfiguredDynamicManagerNotYetLoaded(): void
+    {
+        $freshEm = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $this->decorated->method('getManagerNames')->willReturn(['default' => 'doctrine.orm.default_entity_manager']);
+        $this->decorated->expects($this->never())->method('resetManager');
+        $this->dynamicDbManager->method('hasEntityManager')->willReturn(false);
+        $this->dynamicDbManager->method('getEntityManager')->with('analytics')->willReturn($freshEm);
+
+        $this->assertSame($freshEm, $this->decorator->resetManager('analytics'));
+    }
+
+    public function testResetManagerDelegatesStaticNames(): void
+    {
+        $em = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $this->decorated->method('getManagerNames')->willReturn(['default' => 'doctrine.orm.default_entity_manager']);
+        $this->decorated->expects($this->once())->method('resetManager')->with('default')->willReturn($em);
+        $this->dynamicDbManager->expects($this->never())->method('resetEntityManager');
+
+        $this->assertSame($em, $this->decorator->resetManager('default'));
     }
 
     public function testGetRepositoryWithDynamicManagerName(): void

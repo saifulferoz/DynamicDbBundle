@@ -109,6 +109,20 @@ class DynamicDbManagerTest extends TestCase
         $this->assertFalse($this->manager->hasEntityManager('analytics'));
     }
 
+    public function testResetClearsOpenEntityManagerAndKeepsIt(): void
+    {
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('isOpen')->willReturn(true);
+        $em->expects($this->once())->method('clear');
+        $em->expects($this->never())->method('getConnection');
+        $this->factory->method('createEntityManager')->willReturn($em);
+
+        $this->manager->getEntityManager('analytics', ['driver' => 'pdo_sqlite']);
+        $this->manager->reset();
+
+        $this->assertTrue($this->manager->hasEntityManager('analytics'));
+    }
+
     public function testGetManagerNameForClassPrefersMostSpecificPrefix(): void
     {
         $manager = new DynamicDbManager($this->factory, $this->provider, [
